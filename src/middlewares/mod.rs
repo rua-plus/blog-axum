@@ -18,12 +18,12 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
     );
 
     // Log the request with its ID
-    tracing::info!(
-        request_id = %request_id,
-        method = %request.method(),
-        path = %request.uri().path(),
-        "Incoming request"
-    );
+    // tracing::info!(
+    //     request_id = %request_id,
+    //     method = %request.method(),
+    //     path = %request.uri().path(),
+    //     "Incoming request"
+    // );
 
     // Process the request
     let mut response = next.run(request).await;
