@@ -21,10 +21,20 @@ blog-axum/
 ├── src/
 │   ├── main.rs               # 项目入口文件
 │   │   └── - 初始化追踪系统
+│   │   └── - 加载应用配置
 │   │   └── - 获取 Git 版本信息
-│   │   └── - 创建并启动服务器
+│   │   └── - 创建路由和中间件
+│   │   └── - 启动 HTTP 服务器
+│   ├── response.rs           # 响应模块
+│   │   └── - StatusCode 状态码枚举
+│   │   └── - SuccessResponse 成功响应结构
+│   │   └── - ErrorResponse 错误响应结构
+│   │   └── - PaginationResponse 分页响应结构
+│   ├── middlewares/          # 中间件目录
+│   │   └── mod.rs           # 中间件模块定义
 │   └── utils/                # 工具函数目录
-│       └── - 追踪系统初始化函数
+│       ├── mod.rs           # 工具模块定义
+│       └── config.rs        # 配置加载模块
 ├── lib/                      # 库代码目录
 │   └── blog/                 # 博客核心功能库（git 子模块）
 │       ├── .claude/          # Claude 配置目录
@@ -32,7 +42,7 @@ blog-axum/
 │       ├── CLAUDE.md         # 子模块文档
 │       ├── README.md         # 子模块说明
 │       └── interface.ts      # TypeScript 接口定义
-├── build.rs                  # 构建脚本
+├── build.rs                  # 构建脚本（获取 Git 版本信息）
 ├── target/                   # 编译输出目录
 ├── Cargo.toml                # Cargo 配置文件
 ├── Cargo.lock                # Cargo 依赖锁定文件

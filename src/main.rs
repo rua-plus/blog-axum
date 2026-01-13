@@ -1,10 +1,12 @@
 use anyhow::Context;
 use axum::{Router, routing::get};
+use tower_http::trace::TraceLayer;
 use tracing::{debug, info};
 
 use crate::response::{StatusCode, SuccessResponse};
 use crate::utils::{config, init_tracing};
 
+mod middlewares;
 mod response;
 mod utils;
 
@@ -26,7 +28,9 @@ async fn main() -> anyhow::Result<()> {
     debug!("Git Version: {}", git_version);
 
     // 创建路由
-    let app = Router::new().route("/", get(root));
+    let app = Router::new()
+        .route("/", get(root))
+        .layer(TraceLayer::new_for_http());
 
     // 启动服务器
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
