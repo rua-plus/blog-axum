@@ -1,0 +1,6 @@
+[submodule "lib/sql/blog"]
+	path = lib/sql/blog
+	url = https://github.com/rua-plus/blog.git
+[submodule "lib/blog"]
+	path = lib/blog
+	url = https://github.com/rua-plus/blog.git
