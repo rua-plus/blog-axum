@@ -14,7 +14,7 @@ pub fn init_tracing() -> anyhow::Result<()> {
         let subscriber = Registry::default()
             .with(
                 EnvFilter::from_default_env()
-                    .add_directive(format!("axum_tracing_example={}", log_level).parse()?)
+                    .add_directive(format!("blog_axum={}", log_level).parse()?)
                     .add_directive(format!("tower_http={}", log_level).parse()?),
             )
             .with(
@@ -33,12 +33,14 @@ pub fn init_tracing() -> anyhow::Result<()> {
         let subscriber = Registry::default()
             .with(
                 EnvFilter::from_default_env()
-                    .add_directive(format!("axum_tracing_example={}", log_level).parse()?)
+                    .add_directive(format!("blog_axum={}", log_level).parse()?)
                     .add_directive(format!("tower_http={}", log_level).parse()?),
             )
             .with(
                 fmt::Layer::new()
                     .pretty()
+                    .with_thread_ids(true)
+                    .with_thread_names(true)
                     .with_ansi(true)
                     .with_target(true)
                     .with_line_number(true)
