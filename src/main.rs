@@ -2,12 +2,14 @@ use anyhow::Context;
 use axum::{Router, routing::get};
 use tracing::{debug, info};
 
+use crate::response::{StatusCode, SuccessResponse};
 use crate::utils::{config, init_tracing};
 
+mod response;
 mod utils;
 
-async fn root() -> &'static str {
-    "RUA"
+async fn root() -> axum::response::Json<SuccessResponse<&'static str>> {
+    StatusCode::success(Some("RUA")).into()
 }
 
 #[tokio::main]
