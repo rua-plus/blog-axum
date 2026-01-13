@@ -1,5 +1,5 @@
 use anyhow::Context;
-use axum::{Router, routing::get};
+use axum::{Router, middleware, routing::get};
 use tower_http::trace::TraceLayer;
 use tracing::{debug, info};
 
@@ -30,6 +30,7 @@ async fn main() -> anyhow::Result<()> {
     // 创建路由
     let app = Router::new()
         .route("/", get(root))
+        .layer(middleware::from_fn(middlewares::request_id_middleware))
         .layer(TraceLayer::new_for_http());
 
     // 启动服务器
