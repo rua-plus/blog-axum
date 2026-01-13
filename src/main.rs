@@ -2,7 +2,7 @@ use anyhow::Context;
 use axum::{Router, routing::get};
 use tracing::{debug, info};
 
-use crate::utils::init_tracing;
+use crate::utils::{config, init_tracing};
 
 mod utils;
 
@@ -13,6 +13,10 @@ async fn root() -> &'static str {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing()?;
+
+    // 加载配置
+    let app_config = config::AppConfig::load()?;
+    info!("Configuration loaded successfully: {:?}", app_config);
 
     // 获取 git 版本信息
     let git_version = option_env!("GIT_VERSION").unwrap_or("unknown");

@@ -1,3 +1,5 @@
+pub mod config;
+
 use tracing_subscriber::{EnvFilter, Registry, fmt, prelude::__tracing_subscriber_SubscriberExt};
 
 pub fn init_tracing() -> anyhow::Result<()> {
