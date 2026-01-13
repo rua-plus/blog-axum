@@ -2,16 +2,20 @@ use tracing_subscriber::{EnvFilter, Registry, fmt, prelude::__tracing_subscriber
 
 pub fn init_tracing() -> anyhow::Result<()> {
     // Check if we're in production
-    let is_production = std::env::var("APP_ENV")
+    let is_production = std::env::var("RUA_ENV")
         .map(|env| env == "production")
         .unwrap_or(false);
+
+    // Read log level from RUA_BLOG environment variable, defaulting to info for production and debug for development
+    let default_log_level = if is_production { "info" } else { "debug" };
+    let log_level = std::env::var("RUA_BLOG").unwrap_or(default_log_level.to_string());
 
     if is_production {
         let subscriber = Registry::default()
             .with(
                 EnvFilter::from_default_env()
-                    .add_directive("axum_tracing_example=info".parse()?)
-                    .add_directive("tower_http=info".parse()?),
+                    .add_directive(format!("axum_tracing_example={}", log_level).parse()?)
+                    .add_directive(format!("tower_http={}", log_level).parse()?),
             )
             .with(
                 fmt::Layer::new()
@@ -29,8 +33,8 @@ pub fn init_tracing() -> anyhow::Result<()> {
         let subscriber = Registry::default()
             .with(
                 EnvFilter::from_default_env()
-                    .add_directive("axum_tracing_example=debug".parse()?)
-                    .add_directive("tower_http=debug".parse()?),
+                    .add_directive(format!("axum_tracing_example={}", log_level).parse()?)
+                    .add_directive(format!("tower_http={}", log_level).parse()?),
             )
             .with(
                 fmt::Layer::new()
