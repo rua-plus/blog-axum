@@ -23,10 +23,10 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new().route("/", get(root));
 
     // 启动服务器
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
         .await
-        .with_context(|| "Failed to bind TCP listener to 127.0.0.1:3000")?;
-    info!("Server running on http://127.0.0.1:3000");
+        .with_context(|| "Failed to bind TCP listener to 0.0.0.0:8000")?;
+    info!("Server running on http://0.0.0.0:8000");
     axum::serve(listener, app)
         .await
         .with_context(|| "Failed to serve HTTP server")?;
