@@ -1,6 +1,5 @@
 use anyhow::Context;
 use axum::{Router, middleware, routing::get};
-use tower_http::trace::TraceLayer;
 use tracing::{debug, info};
 
 use crate::response::{StatusCode, SuccessResponse};
@@ -28,65 +27,8 @@ async fn main() -> anyhow::Result<()> {
     debug!("Git Version: {}", git_version);
 
     // 创建路由
-    let app = Router::new()
-        .route("/", get(root))
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(|request: &axum::http::Request<_>| {
-                    let request_id = request
-                        .headers()
-                        .get("X-Request-ID")
-                        .and_then(|v| v.to_str().ok())
-                        .unwrap_or("unknown");
-
-                    tracing::info_span!(
-                        "http_request",
-                        request_id = %request_id,
-                        method = %request.method(),
-                        path = %request.uri().path(),
-                        version = ?request.version(),
-                    )
-                })
-                .on_request(|request: &axum::http::Request<_>, span: &tracing::Span| {
-                    let request_id = request
-                        .headers()
-                        .get("X-Request-ID")
-                        .and_then(|v| v.to_str().ok())
-                        .unwrap_or("unknown");
-
-                    tracing::info!(
-                        parent: span,
-                        request_id = %request_id,
-                        headers = ?request.headers(),
-                        "Request started"
-                    );
-                })
-                .on_response(
-                    |response: &axum::http::Response<_>,
-                     latency: std::time::Duration,
-                     span: &tracing::Span| {
-                        tracing::info!(
-                            parent: span,
-                            status = %response.status(),
-                            latency = ?latency,
-                            headers = ?response.headers(),
-                            "Response sent"
-                        );
-                    },
-                )
-                .on_failure(
-                    |error: tower_http::classify::ServerErrorsFailureClass,
-                     latency: std::time::Duration,
-                     span: &tracing::Span| {
-                        tracing::error!(
-                            parent: span,
-                            error = ?error,
-                            latency = ?latency,
-                            "Request failed"
-                        );
-                    },
-                ),
-        )
+    let app = Router::new().route("/", get(root));
+    let app = middlewares::build_trace_layer(app)
         .layer(middleware::from_fn(middlewares::request_id_middleware));
 
     // 启动服务器

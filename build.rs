@@ -3,7 +3,7 @@ use std::process::Command;
 fn main() {
     // 收集 git commit hash 信息
     let commit_hash = match Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
+        .args(["rev-parse", "--short", "HEAD"])
         .output()
     {
         Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
@@ -11,10 +11,7 @@ fn main() {
     };
 
     // 检查 git 是否是 dirty 状态
-    let is_dirty = match Command::new("git")
-        .args(&["status", "--porcelain"])
-        .output()
-    {
+    let is_dirty = match Command::new("git").args(["status", "--porcelain"]).output() {
         Ok(output) => !output.stdout.is_empty(),
         Err(_) => false,
     };

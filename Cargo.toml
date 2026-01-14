@@ -9,6 +9,7 @@ tokio = { version = "1.49.0", features = ["full"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json", "chrono"] }
 tower-http = { version = "0.6.8", features = ["trace"] }
+tower-layer = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0.100"
