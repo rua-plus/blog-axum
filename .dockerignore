@@ -1,0 +1,47 @@
+.git
+.gitignore
+.gitmodules
+.github
+
+# Rust
+target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Documentation
+README.md
+CLAUDE.md
+*.md
+
+# Test
+tests/
+*.test.rs
+
+# Build artifacts
+build/
+dist/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
