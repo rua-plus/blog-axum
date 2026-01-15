@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: blog-postgres
+    environment:
+      POSTGRES_DB: blog
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - blog-network
+
+  blog-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blog-app
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    environment:
+      - CONFIG_FILE=/config.toml
+    volumes:
+      - ./config.toml:/config.toml:ro
+    networks:
+      - blog-network
+
+secrets:
+  postgres_password:
+    file: ./postgres_password.txt
+
+volumes:
+  postgres_data:
+
+networks:
+  blog-network:
+    driver: bridge
