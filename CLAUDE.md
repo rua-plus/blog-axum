@@ -54,6 +54,45 @@ RUST_LOG=debug cargo run
 
 # Run with trace logging
 RUST_LOG=trace cargo run
+
+# Run with specific module logging
+RUST_LOG=blog_axum=debug,tower_http=debug cargo run
+```
+
+### Using Makefile
+```bash
+# Build the project
+make build
+
+# Run the project
+make run
+
+# Run tests
+make test
+
+# Format code
+make fmt
+
+# Run clippy linter
+make clippy
+
+# Run with debug logging
+make run-debug
+
+# Run with trace logging
+make run-trace
+
+# Clean build artifacts
+make clean
+
+# Generate documentation
+make doc
+
+# Check code without building
+make check
+
+# Install dependencies
+make install
 ```
 
 ## Architecture Overview
