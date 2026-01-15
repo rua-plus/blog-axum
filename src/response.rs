@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // 状态码定义
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusCode {
     // HTTP状态码
     // HttpOk = 200,
@@ -52,6 +52,23 @@ pub enum StatusCode {
     ExternalApiError = 50201,
 }
 
+// 实现 StatusCode 到 u32 的转换
+impl From<StatusCode> for u32 {
+    fn from(code: StatusCode) -> Self {
+        code as u32
+    }
+}
+
+// 实现 StatusCode 的序列化
+impl serde::Serialize for StatusCode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u32(*self as u32)
+    }
+}
+
 // 基础响应结构体
 #[derive(Debug, Serialize)]
 pub struct BaseResponse {
@@ -88,14 +105,14 @@ pub struct ErrorResponse {
 }
 
 // 错误详情结构体
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone, PartialEq)]
 pub struct ErrorDetail {
     pub field: Option<String>,
     pub message: String,
 }
 
 // 分页信息结构体
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone, PartialEq)]
 pub struct PaginationInfo {
     pub page: u32,
     pub page_size: u32,
@@ -302,5 +319,198 @@ impl StatusCode {
 
     pub fn external_api_error() -> ErrorResponse {
         ErrorResponse::new(StatusCode::ExternalApiError, "External API Error")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_success_response_creation() {
+        let data = "test data";
+        let response = StatusCode::success(Some(data));
+
+        assert!(response.success);
+        assert_eq!(response.code, StatusCode::Success);
+        assert_eq!(response.message, "Success");
+        assert!(response.timestamp > 0);
+        assert!(!response.request_id.is_empty());
+        assert_eq!(response.data.unwrap(), data);
+    }
+
+    #[test]
+    fn test_created_response_creation() {
+        let data = "created data";
+        let response = StatusCode::created(Some(data));
+
+        assert!(response.success);
+        assert_eq!(response.code, StatusCode::Created);
+        assert_eq!(response.message, "Created");
+        assert!(response.timestamp > 0);
+        assert!(!response.request_id.is_empty());
+        assert_eq!(response.data.unwrap(), data);
+    }
+
+    #[test]
+    fn test_accepted_response_creation() {
+        let data = "accepted data";
+        let response = StatusCode::accepted(Some(data));
+
+        assert!(response.success);
+        assert_eq!(response.code, StatusCode::Accepted);
+        assert_eq!(response.message, "Accepted");
+        assert!(response.timestamp > 0);
+        assert!(!response.request_id.is_empty());
+        assert_eq!(response.data.unwrap(), data);
+    }
+
+    #[test]
+    fn test_success_response_with_version() {
+        let version = "1.0.0";
+        let response: SuccessResponse<()> = StatusCode::success(None).with_version(version);
+
+        assert_eq!(response.version.unwrap(), version);
+    }
+
+    #[test]
+    fn test_error_response_creation() {
+        let response = StatusCode::bad_request();
+
+        assert!(!response.success);
+        assert_eq!(response.code, StatusCode::BadRequest);
+        assert_eq!(response.message, "Bad Request");
+        assert!(response.timestamp > 0);
+        assert!(!response.request_id.is_empty());
+        assert!(response.errors.is_none());
+        assert!(response.path.is_none());
+        assert!(response.debug.is_none());
+    }
+
+    #[test]
+    fn test_error_response_with_errors() {
+        let errors = vec![
+            ErrorDetail {
+                field: Some("email".to_string()),
+                message: "Email is invalid".to_string(),
+            },
+            ErrorDetail {
+                field: Some("password".to_string()),
+                message: "Password must be at least 8 characters".to_string(),
+            },
+        ];
+
+        let response = StatusCode::validation_error().with_errors(errors.clone());
+
+        assert_eq!(response.errors.unwrap(), errors);
+    }
+
+    #[test]
+    fn test_error_response_with_path_and_debug() {
+        let path = "/api/users";
+        let debug = "Internal server error: connection timeout";
+
+        let response = StatusCode::internal_error()
+            .with_path(path)
+            .with_debug(debug);
+
+        assert_eq!(response.path.unwrap(), path);
+        assert_eq!(response.debug.unwrap(), debug);
+    }
+
+    #[test]
+    fn test_pagination_response_creation() {
+        let list = vec!["item1", "item2", "item3"];
+        let pagination = PaginationInfo {
+            page: 1,
+            page_size: 10,
+            total: 25,
+            total_pages: 3,
+        };
+
+        let response = PaginationResponse::new(
+            StatusCode::Success,
+            "Items retrieved successfully",
+            list.clone(),
+            pagination.clone(),
+        );
+
+        assert!(response.success);
+        assert_eq!(response.code, StatusCode::Success);
+        assert_eq!(response.message, "Items retrieved successfully");
+        assert!(response.timestamp > 0);
+        assert!(!response.request_id.is_empty());
+        assert_eq!(response.data.list, list);
+        assert_eq!(response.data.pagination, pagination);
+    }
+
+    #[test]
+    fn test_pagination_response_with_version() {
+        let list = vec!["item1"];
+        let pagination = PaginationInfo {
+            page: 1,
+            page_size: 10,
+            total: 1,
+            total_pages: 1,
+        };
+
+        let version = "2.1.3";
+        let response = PaginationResponse::new(
+            StatusCode::Success,
+            "Items retrieved successfully",
+            list,
+            pagination,
+        )
+        .with_version(version);
+
+        assert_eq!(response.version.unwrap(), version);
+    }
+
+    #[test]
+    fn test_response_serialization() {
+        let data = "test data";
+        let success_response = StatusCode::success(Some(data));
+        let success_json =
+            serde_json::to_string(&success_response).expect("Failed to serialize success response");
+
+        assert!(success_json.contains("\"success\":true"));
+        assert!(success_json.contains("\"code\":200"));
+        assert!(success_json.contains("\"message\":\"Success\""));
+        assert!(success_json.contains(&format!("\"data\":\"{}\"", data)));
+
+        let error_response = StatusCode::unauthorized();
+        let error_json =
+            serde_json::to_string(&error_response).expect("Failed to serialize error response");
+
+        assert!(error_json.contains("\"success\":false"));
+        assert!(error_json.contains("\"code\":40100"));
+        assert!(error_json.contains("\"message\":\"Unauthorized\""));
+    }
+
+    #[test]
+    fn test_all_status_codes_have_constructors() {
+        // 测试所有成功状态码的构造函数
+        let _: SuccessResponse<()> = StatusCode::success(None);
+        let _: SuccessResponse<()> = StatusCode::created(None);
+        let _: SuccessResponse<()> = StatusCode::accepted(None);
+
+        // 测试所有错误状态码的构造函数
+        let _ = StatusCode::bad_request();
+        let _ = StatusCode::validation_error();
+        let _ = StatusCode::param_error();
+        let _ = StatusCode::unauthorized();
+        let _ = StatusCode::token_expired();
+        let _ = StatusCode::token_invalid();
+        let _ = StatusCode::forbidden();
+        let _ = StatusCode::access_denied();
+        let _ = StatusCode::not_found();
+        let _ = StatusCode::resource_not_found();
+        let _ = StatusCode::conflict();
+        let _ = StatusCode::duplicate_resource();
+        let _ = StatusCode::internal_error();
+        let _ = StatusCode::service_unavailable();
+        let _ = StatusCode::database_error();
+        let _ = StatusCode::third_party_error();
+        let _ = StatusCode::external_api_error();
     }
 }
