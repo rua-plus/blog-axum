@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use axum::response::IntoResponse;
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -319,6 +320,58 @@ impl StatusCode {
 
     pub fn external_api_error() -> ErrorResponse {
         ErrorResponse::new(StatusCode::ExternalApiError, "External API Error")
+    }
+}
+
+use axum::http::StatusCode as AxumStatusCode;
+
+impl IntoResponse for ErrorResponse {
+    fn into_response(self) -> axum::response::Response {
+        // 根据业务代码确定 HTTP 状态码
+        let http_status = match self.code {
+            StatusCode::BadRequest | StatusCode::ValidationError | StatusCode::ParamError => {
+                AxumStatusCode::BAD_REQUEST
+            }
+            StatusCode::Unauthorized | StatusCode::TokenExpired | StatusCode::TokenInvalid => {
+                AxumStatusCode::UNAUTHORIZED
+            }
+            StatusCode::Forbidden | StatusCode::AccessDenied => AxumStatusCode::FORBIDDEN,
+            StatusCode::NotFound | StatusCode::ResourceNotFound => AxumStatusCode::NOT_FOUND,
+            StatusCode::Conflict | StatusCode::DuplicateResource => AxumStatusCode::CONFLICT,
+            StatusCode::InternalError
+            | StatusCode::ServiceUnavailable
+            | StatusCode::DatabaseError => AxumStatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::ThirdPartyError | StatusCode::ExternalApiError => {
+                AxumStatusCode::BAD_GATEWAY
+            }
+            _ => AxumStatusCode::OK,
+        };
+
+        let body = match serde_json::to_string(&self) {
+            Ok(json) => json,
+            Err(_) => serde_json::to_string(&ErrorResponse::new(
+                StatusCode::InternalError,
+                "Failed to serialize error response",
+            ))
+            .unwrap(),
+        };
+
+        (http_status, body).into_response()
+    }
+}
+
+impl<T: Serialize> IntoResponse for SuccessResponse<T> {
+    fn into_response(self) -> axum::response::Response {
+        let body = match serde_json::to_string(&self) {
+            Ok(json) => json,
+            Err(_) => serde_json::to_string(&ErrorResponse::new(
+                StatusCode::InternalError,
+                "Failed to serialize success response",
+            ))
+            .unwrap(),
+        };
+
+        (AxumStatusCode::OK, body).into_response()
     }
 }
 

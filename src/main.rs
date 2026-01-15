@@ -1,16 +1,48 @@
-use anyhow::Context;
-use axum::{Router, middleware, routing::get};
+use anyhow::{Context, Result};
+use axum::{Router, extract::State, middleware, response::IntoResponse, routing::get};
+use sqlx::PgPool;
 use tracing::{debug, info};
 
+use crate::models::User;
 use crate::response::{StatusCode, SuccessResponse};
 use crate::utils::{config, init_tracing};
 
 mod middlewares;
+mod models;
 mod response;
 mod utils;
 
+// 使用 newtype 模式为 anyhow::Error 实现 IntoResponse
+struct AppError(anyhow::Error);
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        StatusCode::database_error()
+            .with_debug(self.0.to_string())
+            .into_response()
+    }
+}
+
+// 为 anyhow::Error 实现转换为 AppError
+impl From<anyhow::Error> for AppError {
+    fn from(err: anyhow::Error) -> Self {
+        AppError(err)
+    }
+}
+
 async fn root() -> axum::response::Json<SuccessResponse<&'static str>> {
     StatusCode::success(Some("RUA")).into()
+}
+
+async fn get_users_list(
+    State(pool): State<PgPool>,
+) -> Result<axum::response::Json<SuccessResponse<Vec<User>>>, AppError> {
+    let users = sqlx::query_as::<_, User>("SELECT id, username, email, avatar_url, bio, last_login, created_at, updated_at FROM users ORDER BY created_at DESC")
+        .fetch_all(&pool)
+        .await
+        .context("Failed to query users")?;
+
+    Ok(StatusCode::success(Some(users)).into())
 }
 
 #[tokio::main]
@@ -26,8 +58,28 @@ async fn main() -> anyhow::Result<()> {
     info!("Git Version: {}", git_version);
     debug!("Git Version: {}", git_version);
 
+    // 创建数据库连接池
+    let database_url = format!(
+        "postgres://{}:{}@{}:{}/{}",
+        app_config.postgresql.user,
+        app_config.postgresql.password,
+        app_config.postgresql.host,
+        app_config.postgresql.port,
+        app_config.postgresql.database
+    );
+
+    let pool = PgPool::connect(&database_url)
+        .await
+        .with_context(|| "Failed to connect to database")?;
+
+    info!("Database connection pool created successfully");
+
     // 创建路由
-    let app = Router::new().route("/", get(root));
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/users/list", get(get_users_list))
+        .with_state(pool);
+
     let app = middlewares::build_trace_layer(app)
         .layer(middleware::from_fn(middlewares::request_id_middleware));
 
