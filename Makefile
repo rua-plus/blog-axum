@@ -31,6 +31,9 @@ clean:
 fmt:
 	cargo fmt
 
+fix:
+	cargo fix --allow-dirty
+
 # Run clippy linter
 clippy:
 	cargo clippy --all-targets --all-features

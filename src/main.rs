@@ -1,34 +1,18 @@
-use anyhow::{Context, Result};
-use axum::{Router, extract::State, middleware, response::IntoResponse, routing::get};
+use anyhow::Context;
+use axum::{Router, extract::State, middleware, routing::get};
 use sqlx::PgPool;
 use tracing::{debug, info};
 
+use crate::error::AppResult;
 use crate::models::User;
 use crate::response::{StatusCode, SuccessResponse};
 use crate::utils::{config, init_tracing};
 
+mod error;
 mod middlewares;
 mod models;
 mod response;
 mod utils;
-
-// 使用 newtype 模式为 anyhow::Error 实现 IntoResponse
-struct AppError(anyhow::Error);
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> axum::response::Response {
-        StatusCode::database_error()
-            .with_debug(self.0.to_string())
-            .into_response()
-    }
-}
-
-// 为 anyhow::Error 实现转换为 AppError
-impl From<anyhow::Error> for AppError {
-    fn from(err: anyhow::Error) -> Self {
-        AppError(err)
-    }
-}
 
 async fn root() -> axum::response::Json<SuccessResponse<&'static str>> {
     StatusCode::success(Some("RUA")).into()
@@ -36,8 +20,11 @@ async fn root() -> axum::response::Json<SuccessResponse<&'static str>> {
 
 async fn get_users_list(
     State(pool): State<PgPool>,
-) -> Result<axum::response::Json<SuccessResponse<Vec<User>>>, AppError> {
-    let users = sqlx::query_as::<_, User>("SELECT id, username, email, avatar_url, bio, last_login, created_at, updated_at FROM users ORDER BY created_at DESC")
+) -> AppResult<axum::response::Json<SuccessResponse<Vec<User>>>> {
+    let users = sqlx::query_as::<_, User>(
+r#"SELECT id, username, email, avatar_url, bio, last_login, created_at, updated_at FROM users
+ORDER BY created_at DESC"#
+    )
         .fetch_all(&pool)
         .await
         .context("Failed to query users")?;
@@ -68,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
         app_config.postgresql.database
     );
 
+    info!("Connecting databse: {}", app_config.postgresql.host);
     let pool = PgPool::connect(&database_url)
         .await
         .with_context(|| "Failed to connect to database")?;
