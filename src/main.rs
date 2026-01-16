@@ -7,6 +7,7 @@ use crate::response::{StatusCode, SuccessResponse};
 use crate::utils::{config, init_tracing};
 
 mod error;
+mod extractors;
 mod middlewares;
 mod models;
 mod response;
