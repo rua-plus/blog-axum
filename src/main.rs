@@ -52,6 +52,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .merge(routes::create_routes())
         .with_state(pool);
+    let app = Router::new().nest("/api", app);
 
     let app = middlewares::build_trace_layer(app)
         .layer(middleware::from_fn(middlewares::request_id_middleware));
