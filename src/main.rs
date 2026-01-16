@@ -57,10 +57,9 @@ async fn main() -> anyhow::Result<()> {
 
     // 创建路由
     let app = Router::new()
-        .route("/", get(root))
-        .merge(routes::create_routes())
+        .route("/api/", get(root))
+        .nest("/api", routes::create_routes())
         .with_state((pool, jwt_service));
-    let app = Router::new().nest("/api", app);
 
     let app = middlewares::build_trace_layer(app)
         .layer(middleware::from_fn(middlewares::request_id_middleware));

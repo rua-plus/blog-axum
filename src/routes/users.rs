@@ -16,6 +16,7 @@ use crate::utils::password;
 
 pub fn routes() -> Router<(PgPool, crate::utils::jwt::JwtService)> {
     Router::new()
+        .route("/users/list", get(get_users_list))
         .route("/users/login", post(login))
         .route("/users/create", post(create_user))
 }
@@ -69,10 +70,10 @@ ORDER BY created_at DESC"#
 
 #[derive(Debug, Deserialize, Serialize, Validate)]
 pub struct LoginRequest {
-    #[validate(email)]
-    pub email: String,
+    #[validate()]
+    pub identifier: String,
 
-    #[validate(length(min = 8))]
+    #[validate()]
     pub password: String,
 }
 
@@ -90,17 +91,17 @@ async fn login(
         r#"SELECT id, username, email, avatar_url, bio, last_login, created_at, updated_at
         FROM users WHERE email = $1"#,
     )
-    .bind(&payload.email)
+    .bind(&payload.identifier)
     .fetch_one(&pool)
     .await
-    .context("Invalid email or password")?;
+    .context("Invalid identifier or password")?;
 
     let password_hash: String =
         sqlx::query_scalar(r#"SELECT password_hash FROM users WHERE email = $1"#)
-            .bind(&payload.email)
+            .bind(&payload.identifier)
             .fetch_one(&pool)
             .await
-            .context("Invalid email or password")?;
+            .context("Invalid identifier or password")?;
 
     password::verify_password(&payload.password, &password_hash)?;
 
