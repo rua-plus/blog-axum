@@ -14,11 +14,10 @@ use crate::models::User;
 use crate::response::{StatusCode, SuccessResponse};
 use crate::utils::password;
 
-pub fn routes() -> Router<PgPool> {
+pub fn routes() -> Router<(PgPool, crate::utils::jwt::JwtService)> {
     Router::new()
-        .route("/users/list", get(get_users_list))
-        .route("/users/create", post(create_user))
         .route("/users/login", post(login))
+        .route("/users/create", post(create_user))
 }
 
 #[derive(Debug, Deserialize, Serialize, Validate)]
@@ -34,7 +33,7 @@ pub struct CreateUserRequest {
 }
 
 async fn create_user(
-    State(pool): State<PgPool>,
+    State((pool, _jwt_service)): State<(PgPool, crate::utils::jwt::JwtService)>,
     ValidatedJson(payload): ValidatedJson<CreateUserRequest>,
 ) -> AppResult<axum::response::Json<SuccessResponse<User>>> {
     let password_hash = password::hash_password(&payload.password)?;
@@ -55,7 +54,7 @@ async fn create_user(
 }
 
 async fn get_users_list(
-    State(pool): State<PgPool>,
+    State((pool, _jwt_service)): State<(PgPool, crate::utils::jwt::JwtService)>,
 ) -> AppResult<axum::response::Json<SuccessResponse<Vec<User>>>> {
     let users = sqlx::query_as::<_, User>(
 r#"SELECT id, username, email, avatar_url, bio, last_login, created_at, updated_at FROM users
@@ -77,10 +76,16 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct LoginResponse {
+    pub user: User,
+    pub token: String,
+}
+
 async fn login(
-    State(pool): State<PgPool>,
+    State((pool, jwt_service)): State<(PgPool, crate::utils::jwt::JwtService)>,
     ValidatedJson(payload): ValidatedJson<LoginRequest>,
-) -> AppResult<axum::response::Json<SuccessResponse<User>>> {
+) -> AppResult<axum::response::Json<SuccessResponse<LoginResponse>>> {
     let user: User = sqlx::query_as(
         r#"SELECT id, username, email, avatar_url, bio, last_login, created_at, updated_at
         FROM users WHERE email = $1"#,
@@ -99,5 +104,7 @@ async fn login(
 
     password::verify_password(&payload.password, &password_hash)?;
 
-    Ok(StatusCode::success(Some(user)).into())
+    let token = jwt_service.generate_token(&user.id.to_string())?;
+
+    Ok(StatusCode::success(Some(LoginResponse { user, token })).into())
 }

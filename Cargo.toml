@@ -22,3 +22,5 @@ async-trait = "0.1"
 argon2 = { version = "0.5", features = ["std", "password-hash"] }
 password-hash = { version = "0.5", features = ["std"] }
 rand = { version = "0.9.2", features = ["std"] }
+jsonwebtoken = "9.3.0"
+chrono = "0.4.38"

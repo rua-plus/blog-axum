@@ -1,3 +1,5 @@
+pub mod auth;
+
 use axum::{Router, extract::Request, http::HeaderValue, middleware::Next, response::Response};
 use tower_http::trace::TraceLayer;
 use uuid::Uuid;

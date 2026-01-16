@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use tracing::debug;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct PostgresConfig {
     pub host: String,
     pub port: u16,
@@ -14,13 +14,13 @@ pub struct PostgresConfig {
     pub database: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct JwtConfig {
     pub secret: String,
     pub expires_in: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct AppConfig {
     pub postgresql: PostgresConfig,
     pub jwt: JwtConfig,

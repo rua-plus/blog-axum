@@ -14,7 +14,9 @@ mod response;
 mod routes;
 mod utils;
 
-async fn root(_state: State<PgPool>) -> axum::response::Json<SuccessResponse<&'static str>> {
+async fn root(
+    _state: State<(PgPool, crate::utils::jwt::JwtService)>,
+) -> axum::response::Json<SuccessResponse<&'static str>> {
     StatusCode::success(Some("RUA")).into()
 }
 
@@ -48,11 +50,16 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Database connection pool created successfully");
 
+    // 创建 JWT 服务
+    let jwt_service = crate::utils::jwt::JwtService::from_config(&app_config)
+        .with_context(|| "Failed to create JWT service")?;
+    info!("JWT service initialized successfully");
+
     // 创建路由
     let app = Router::new()
         .route("/", get(root))
         .merge(routes::create_routes())
-        .with_state(pool);
+        .with_state((pool, jwt_service));
     let app = Router::new().nest("/api", app);
 
     let app = middlewares::build_trace_layer(app)

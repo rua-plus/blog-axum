@@ -1,4 +1,5 @@
 pub mod config;
+pub mod jwt;
 pub mod password;
 
 use tracing_subscriber::{EnvFilter, Registry, fmt, prelude::__tracing_subscriber_SubscriberExt};

@@ -42,3 +42,9 @@ impl From<config::ConfigError> for AppError {
         AppError::new(err)
     }
 }
+
+impl From<crate::utils::jwt::JwtError> for AppError {
+    fn from(err: crate::utils::jwt::JwtError) -> Self {
+        AppError::new(err)
+    }
+}
