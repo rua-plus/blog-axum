@@ -3,8 +3,6 @@ use axum::{Router, extract::State, middleware, routing::get};
 use sqlx::PgPool;
 use tracing::{debug, info};
 
-use crate::error::AppResult;
-use crate::models::User;
 use crate::response::{StatusCode, SuccessResponse};
 use crate::utils::{config, init_tracing};
 
@@ -12,24 +10,11 @@ mod error;
 mod middlewares;
 mod models;
 mod response;
+mod routes;
 mod utils;
 
-async fn root() -> axum::response::Json<SuccessResponse<&'static str>> {
+async fn root(_state: State<PgPool>) -> axum::response::Json<SuccessResponse<&'static str>> {
     StatusCode::success(Some("RUA")).into()
-}
-
-async fn get_users_list(
-    State(pool): State<PgPool>,
-) -> AppResult<axum::response::Json<SuccessResponse<Vec<User>>>> {
-    let users = sqlx::query_as::<_, User>(
-r#"SELECT id, username, email, avatar_url, bio, last_login, created_at, updated_at FROM users
-ORDER BY created_at DESC"#
-    )
-        .fetch_all(&pool)
-        .await
-        .context("Failed to query users")?;
-
-    Ok(StatusCode::success(Some(users)).into())
 }
 
 #[tokio::main]
@@ -65,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     // 创建路由
     let app = Router::new()
         .route("/", get(root))
-        .route("/users/list", get(get_users_list))
+        .merge(routes::create_routes())
         .with_state(pool);
 
     let app = middlewares::build_trace_layer(app)

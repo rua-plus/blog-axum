@@ -35,7 +35,10 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
 ///
 /// This layer provides comprehensive logging for HTTP requests and responses,
 /// including request IDs, methods, paths, status codes, and latency.
-pub fn build_trace_layer(app: Router) -> Router {
+pub fn build_trace_layer<S>(app: Router<S>) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
     app.layer(
         TraceLayer::new_for_http()
             .make_span_with(|request: &axum::http::Request<_>| {
