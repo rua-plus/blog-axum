@@ -98,23 +98,13 @@ make doc
 - Example:
   ```rust
   // src/main.rs
-  use std::net::SocketAddr;
-  use std::sync::Arc;
+  use anyhow::Context;
+  use axum::{Router, extract::State, middleware, routing::get};
+  use sqlx::PgPool;
+  use tracing::{debug, info};
 
-  use axum::{
-      extract::State,
-      http::StatusCode,
-      response::IntoResponse,
-      routing::get,
-      Router,
-  };
-  use tracing_subscriber::layer::SubscriberExt;
-
-  use crate::{
-      middlewares::build_middleware_stack,
-      response::success,
-      utils::{config::load_config, init_tracing},
-  };
+  use crate::response::{StatusCode, SuccessResponse};
+  use crate::utils::{config, init_tracing};
   ```
 
 ### Naming Conventions
@@ -131,32 +121,42 @@ make doc
 - Example:
   ```rust
   // src/response.rs
-  pub struct SuccessResponse<T: Serialize> {
+  pub struct SuccessResponse<T> {
       pub success: bool,
-      pub code: u32,
+      pub code: StatusCode,
       pub message: String,
-      pub data: T,
       pub timestamp: u64,
       pub request_id: String,
-      pub version: String,
+      pub data: Option<T>,
+      pub version: Option<String>,
   }
   ```
 
 ### Error Handling
-- Use `anyhow` for application-level errors
-- Return `Result<T, AppError>` for fallible operations
-- Use custom error types for domain-specific errors
-- Example from src/utils/config.rs:
+- Use custom `AppError` type wrapping `anyhow::Error` for application-level errors
+- Return `AppResult<T>` (type alias for `anyhow::Result<T, AppError>`) for fallible operations
+- Implement `From` trait for common error types (sqlx, config, jwt)
+- Example from src/error.rs:
   ```rust
-  pub fn load_config() -> Result<AppConfig, ConfigError> {
-      let config_file = env::var("CONFIG_FILE").unwrap_or_else(|_| "config.toml".into());
-      
-      Config::builder()
-          .add_source(File::with_name(&config_file))
-          .add_source(Environment::with_prefix("APP").separator("_"))
-          .build()?
-          .try_deserialize()
+  #[derive(Debug)]
+  pub struct AppError(Error);
+
+  impl AppError {
+      pub fn new<E: Into<Error>>(err: E) -> Self {
+          AppError(err.into())
+      }
   }
+
+  impl IntoResponse for AppError {
+      fn into_response(self) -> Response {
+          error!("{:?}", self);
+          StatusCode::internal_error()
+              .with_debug(self.0.to_string())
+              .into_response()
+      }
+  }
+
+  pub type AppResult<T> = anyhow::Result<T, AppError>;
   ```
 
 ### Formatting Rules
@@ -164,31 +164,6 @@ make doc
 - 4 spaces per indentation level
 - Max line length: 100 characters
 - Blank lines between logical code blocks
-- Example:
-  ```rust
-  // src/middlewares/mod.rs
-  pub fn build_trace_layer() -> TraceLayer<Span> {
-      TraceLayer::new_for_http()
-          .make_span_with(|request: &Request<_>| {
-              tracing::info_span!(
-                  "HTTP Request",
-                  method = ?request.method(),
-                  path = ?request.uri().path(),
-                  request_id = %get_request_id(request),
-              )
-          })
-          .on_request(|_request: &Request<_>, _span: &Span| {
-              tracing::debug!("Request received")
-          })
-          .on_response(|response: &Response<_>, latency: Duration, _span: &Span| {
-              tracing::info!(
-                  status = ?response.status(),
-                  latency = %latency.as_millis(),
-                  "Response sent"
-              );
-          })
-  }
-  ```
 
 ## Project Structure and Architecture
 
@@ -197,6 +172,8 @@ make doc
 1. **Entry Point** (`src/main.rs`)
    - Initializes tracing/logging system
    - Loads application configuration
+   - Creates database connection pool
+   - Initializes JWT service
    - Sets up middleware stack
    - Creates and starts HTTP server
 
@@ -205,15 +182,35 @@ make doc
    - Custom status codes (business logic codes, not HTTP)
    - Automatic timestamp and request ID generation
    - Git version integration
+   - Key structs: `SuccessResponse<T>`, `ErrorResponse`, `PaginationResponse<T>`
 
-3. **Configuration** (`src/utils/config.rs`)
-   - TOML-based configuration with `config.toml`
-   - Environment variable support via `CONFIG_FILE`
-   - PostgreSQL and JWT configuration sections
+3. **Error Handling** (`src/error.rs`)
+   - Custom `AppError` type wrapping `anyhow::Error`
+   - Conversion from common error sources (sqlx, config, jwt)
+   - `AppResult<T>` type alias for simplified error handling
 
-4. **Middleware** (`src/middlewares/mod.rs`)
+4. **Extractors** (`src/extractors.rs`)
+   - `ValidatedJson<T>`: Validates request JSON against validator crate rules
+   - `Auth`: Extracts and validates JWT tokens from Authorization header
+   - Custom rejection handling for validation and authentication errors
+
+5. **Middleware** (`src/middlewares/mod.rs`)
    - Request ID tracking for distributed tracing
-   - HTTP request/response logging via Tower HTTP
+   - HTTP request/response logging via Tower HTTP TraceLayer
+
+6. **Routes** (`src/routes/`)
+   - `mod.rs`: Route definitions and creation function
+   - `users.rs`: User management endpoints (list, login, create)
+
+7. **Models** (`src/models/mod.rs`)
+   - Data models (User struct) with validation using validator crate
+   - Database schema definitions for SQLx
+
+8. **Utilities** (`src/utils/`)
+   - `config.rs`: Configuration loader (TOML + environment variables)
+   - `jwt.rs`: JWT token service (creation, validation)
+   - `password.rs`: Password hashing/verification using Argon2
+   - `mod.rs`: General utility functions
 
 ### Key Design Patterns
 
@@ -221,6 +218,8 @@ make doc
 2. **Request Tracking**: Each request gets a unique UUID for end-to-end tracing
 3. **Version Integration**: Git commit hash automatically embedded in responses via build script
 4. **Error Classification**: Business error codes (40000-50201 range) separate from HTTP status codes
+5. **Validation**: Request validation using validator crate with custom extractor
+6. **Authentication**: JWT token validation via custom extractor
 
 ### Configuration Flow
 
@@ -232,14 +231,16 @@ make doc
 ### Middleware Stack
 
 1. `request_id_middleware` - Adds X-Request-ID header
-2. `TraceLayer` - HTTP request/response logging
+2. `TraceLayer` - HTTP request/response logging with latency tracking
 
 ## Adding New Features
 
 ### New API Endpoint
-1. Add route in `main.rs` `Router::new()` chain
-2. Create handler function returning appropriate response type
+1. Add route in `src/routes/mod.rs`
+2. Create handler function in appropriate routes file (e.g., `src/routes/users.rs`)
 3. Use `StatusCode::{success,created,etc}()` for consistent responses
+4. For authenticated routes, use `Auth` extractor
+5. For validated requests, use `ValidatedJson<T>` extractor
 
 ### New Configuration
 1. Add struct field to `AppConfig` in `src/utils/config.rs`
@@ -249,6 +250,11 @@ make doc
 ### New Middleware
 1. Create middleware function in `src/middlewares/mod.rs`
 2. Add to middleware stack in `main.rs` with `.layer()`
+
+### New Data Model
+1. Add struct to `src/models/mod.rs` with validation attributes
+2. Implement necessary traits (Debug, Clone, Serialize, Deserialize)
+3. Add database queries in appropriate utils module
 
 ## Important Notes
 
@@ -263,43 +269,40 @@ make doc
 ### Writing Tests
 - Place tests in the same module with `#[cfg(test)]` attribute
 - Use `tokio::test` for async tests
-- Example from src/utils/config.rs:
+- Example from src/response.rs:
   ```rust
   #[cfg(test)]
   mod tests {
       use super::*;
-      use tempfile::NamedTempFile;
-      use std::fs::write;
 
       #[test]
-      fn test_load_config() {
-          let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-          let config_content = r#"
-              [postgresql]
-              host = 'localhost'
-              port = 5432
-              user = 'test'
-              password = 'test'
-              database = 'test_db'
+      fn test_success_response_creation() {
+          let data = "test data";
+          let response = StatusCode::success(Some(data));
 
-              [jwt]
-              secret = 'test-secret'
-              expires_in = '7d'
-          "#;
-          
-          write(temp_file.path(), config_content).expect("Failed to write temp config");
-          
-          std::env::set_var("CONFIG_FILE", temp_file.path().to_str().unwrap());
-          
-          let config = load_config().expect("Failed to load test config");
-          
-          assert_eq!(config.postgresql.host, "localhost");
-          assert_eq!(config.jwt.secret, "test-secret");
+          assert!(response.success);
+          assert_eq!(response.code, StatusCode::Success);
+          assert_eq!(response.message, "Success");
+          assert!(response.timestamp > 0);
+          assert!(!response.request_id.is_empty());
+          assert_eq!(response.data.unwrap(), data);
       }
   }
   ```
 
 ### Running Tests
 - Run all tests: `cargo test`
-- Run specific test: `cargo test test_load_config`
+- Run specific test: `cargo test test_success_response_creation`
 - Run tests with output: `cargo test -- --nocapture`
+
+## Key Technologies
+
+- **Framework**: Axum 0.8.8 (async web framework)
+- **Runtime**: Tokio 1.49.0 (async runtime)
+- **Database**: SQLx with PostgreSQL
+- **Authentication**: JWT tokens (jsonwebtoken crate)
+- **Password Hashing**: Argon2 (argon2 crate)
+- **Validation**: validator crate (with derive macros)
+- **Configuration**: config crate (TOML + environment variables)
+- **Tracing/Logging**: tracing and tracing-subscriber
+- **HTTP Middleware**: tower-http (trace layer)
