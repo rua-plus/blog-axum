@@ -19,3 +19,6 @@ uuid = { version = "1.19.0", features = [ "v4" ] }
 validator = { version = "0.20.0", features = ["derive"] }
 tower = "0.5"
 async-trait = "0.1"
+argon2 = { version = "0.5", features = ["std", "password-hash"] }
+password-hash = { version = "0.5", features = ["std"] }
+rand = { version = "0.9.2", features = ["std"] }
